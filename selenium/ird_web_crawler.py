@@ -145,7 +145,7 @@ def selenium_get_page_links(url):
     Returns:
         list (str): all links in the source url
     """
-    logging.info("Getting page {}".format(url))
+    logging.info("Analyze links in page {}".format(url))
     ret_links = set()
 
     try:
@@ -167,21 +167,18 @@ def crawl_pages(depth, file_links, pages_to_crawl, page_skip):
     Recursive function of crawl the webpage and its sub pages
     Args:
         depth (int): Maximum depth of the link to jump
-        file_links (list str): All the file links found
-        pages_to_crawl (list str): Pages to analyze
-        page_skip (list str): Pages analyzed or pages which will not be analyzed like file
-
+        file_links (set str): All the file links found
+        pages_to_crawl (set str): Pages to analyze
+        page_skip (set str): Pages analyzed or pages which will not be analyzed like file
     Returns:
-        list str: file links found
-        list str: analyzed pages
+        set str: file links found
+        set str: analyzed pages
+        set str: accessed pages
     """
 
-    #TODO
-    # add logic to avoid multiple checking of headers
-    # now cannot pass previous depth checking pages
-
     if depth == 0:
-        return file_links, page_skip
+        page_accessed = file_links.union(pages_to_crawl).union(page_skip)
+        return file_links, page_skip, page_accessed
     else:
         new_depth_pages = set()
         total_pages = len(pages_to_crawl)
@@ -202,7 +199,7 @@ def crawl_pages(depth, file_links, pages_to_crawl, page_skip):
                 else:
                     if is_link_valid(link):
                         if is_file_link(link):
-                            logging.info("{} {} Found file link {}".format(depth_message, page_message, link))
+                            logging.info("{}{} Found file link {}".format(depth_message, page_message, link))
                             url_files.add(link)
                             page_skip.add(link)
                         else:
@@ -215,7 +212,7 @@ def crawl_pages(depth, file_links, pages_to_crawl, page_skip):
             # new_depth_pages = new_depth_pages.union(url_pages)
 
         new_depth_pages = new_depth_pages - page_skip
-        logging.info("[{}] {} new pages".format(depth, len(new_depth_pages)))
+        logging.info("[{}] {} new pages found to analyze in next depth level".format(depth, len(new_depth_pages)))
 
         return crawl_pages(depth - 1, file_links, new_depth_pages, page_skip)
 
@@ -259,17 +256,18 @@ def main():
     try:
         log_setup()
         create_web_driver()
-        # get_login_session()
+        get_login_session()
         start_time = time.time()
-        files, crawled_pages = crawl_pages(config.depth, set(), [config.url_start_page], set())
+        files_found, pages_analyzed, pages_accessed = crawl_pages(config.depth, set(), [config.url_start_page], set())
         end_time = time.time()
 
         logging.info(">>>> Summary")
         logging.info(">> Depth {}".format(config.depth))
-        logging.info(">> Number of file links found: {}".format(len(files)))
-        logging.info(">> Number of page analysed: {}".format(len(crawled_pages)))
+        logging.info(">> Number of file links found: {}".format(len(files_found)))
+        logging.info(">> Number of page analyzed: {}".format(len(pages_analyzed)))
+        logging.info(">> Number of page accessed: {}".format(len(pages_accessed)))
         logging.info(">> Time used (s): {}".format(end_time - start_time))
-        logging.info(">> List of files:\n>>>>{}\n".format("\n>>>> ".join(files)))
+        logging.info(">> List of files:\n>>>>{}\n".format("\n>>>> ".join(files_found)))
 
     except Exception as e:
         logging.exception(str(e))
