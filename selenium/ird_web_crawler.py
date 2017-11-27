@@ -25,9 +25,10 @@ class config:
     password = "Linkpower2016"
 
     # crawling config
+    # url_start_page = "http://192.168.11.182:8002/"
     url_start_page = "https://blog.scrapinghub.com/"
     depth = 2
-    allow_domains = ["blog.scrapinghub.com"]
+    allow_domains = ["blog.scrapinghub.com", "192.168.11.182:8002"]
 
     # logging
     path_log_dir = "logs"
@@ -53,14 +54,14 @@ def is_file_link(link):
         bool: False if it is webpage, otherwise False
     """
     try:
-        content_type = requests.head(link).headers['content-type']
-        if "text/html" in content_type:
-            return False
+        content_type = session_requset.head(link).headers['content-type']
+        if not "text/html" in content_type:
+            return True
     except Exception as e:
         logging.warning("Exception in is_file_link {}. Reason:{}".format(link, e))
-        return False
 
-    return True
+    return False
+
 
 
 def create_web_driver():
@@ -84,17 +85,22 @@ def get_login_session():
     1 firefox_driver
     2 session_requset
     """
-    logging.info("Retrieve firefox login session")
-    firefox_driver.get(config.url_login)
-    time.sleep(3)
-    firefox_driver.switch_to.alert.send_keys(config.username + Keys.TAB + config.password)
-    time.sleep(0.5)
-    firefox_driver.switch_to.alert.accept()
-    time.sleep(3)
-    firefox_driver.close()
+    try:
+        global firefox_driver
+        logging.info("Retrieve firefox login session")
+        firefox_driver.get(config.url_login)
+        time.sleep(3)
+        firefox_driver.switch_to.alert.send_keys(config.username + Keys.TAB + config.password)
+        time.sleep(0.5)
+        firefox_driver.switch_to.alert.accept()
+        time.sleep(1)
+        # firefox_driver.close()
 
-    logging.info("Retrieve firefox login session")
-    session_requset.get(config.url_login, auth=HttpNtlmAuth(config.username, config.password))
+        logging.info("Retrieve request login session")
+        global session_requset
+        session_requset.get(config.url_login, auth=HttpNtlmAuth(config.username, config.password))
+    except Exception as e:
+        logging.exception("Found exception when retrieving login session. {}".format(str(e)))
 
 
 def is_link_valid(url):
@@ -162,7 +168,7 @@ def selenium_get_page_links(url):
     return ret_links
 
 
-def crawl_pages(depth, file_links, pages_to_crawl, page_skip):
+def ird_crawl_pages(depth, file_links, pages_to_crawl, page_skip):
     """
     Recursive function of crawl the webpage and its sub pages
     Args:
@@ -214,7 +220,7 @@ def crawl_pages(depth, file_links, pages_to_crawl, page_skip):
         new_depth_pages = new_depth_pages - page_skip
         logging.info("[{}] {} new pages found to analyze in next depth level".format(depth, len(new_depth_pages)))
 
-        return crawl_pages(depth - 1, file_links, new_depth_pages, page_skip)
+        return ird_crawl_pages(depth - 1, file_links, new_depth_pages, page_skip)
 
 
 def log_setup():
@@ -248,30 +254,35 @@ def main():
     Main Program
     Flow:
     1. Setup log
-    2. Create web driver
-    3. Get login session
-    4. Execute crawling process
-    5. Display results
+    2. Create web driver and get login session
+    3. Execute crawling process
+    4. Display results
     """
     try:
+        # 1
         log_setup()
+        # 2
         create_web_driver()
         get_login_session()
+
+        # 3
         start_time = time.time()
-        files_found, pages_analyzed, pages_accessed = crawl_pages(config.depth, set(), [config.url_start_page], set())
+        files_found, pages_analyzed, pages_accessed = ird_crawl_pages(config.depth, set(), [config.url_start_page], set())
         end_time = time.time()
 
+        # 4
         logging.info(">>>> Summary")
         logging.info(">> Depth {}".format(config.depth))
-        logging.info(">> Number of file links found: {}".format(len(files_found)))
-        logging.info(">> Number of page analyzed: {}".format(len(pages_analyzed)))
-        logging.info(">> Number of page accessed: {}".format(len(pages_accessed)))
         logging.info(">> Time used (s): {}".format(end_time - start_time))
-        logging.info(">> List of files:\n>>>>{}\n".format("\n>>>> ".join(files_found)))
+        logging.info(">> Number of page analyzed: {}".format(len(pages_analyzed)))
+        logging.info(">> Number of links tracked: {}".format(len(pages_accessed)))
+        logging.info(">> Number of file links found: {}".format(len(files_found)))
+        logging.info(".>> List of files:\n    {}".format("\n    ".join(files_found)))
 
     except Exception as e:
         logging.exception(str(e))
 
+    global firefox_driver
     if firefox_driver:
         logging.info("Closing firefox driver")
         firefox_driver.close()
