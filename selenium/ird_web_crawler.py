@@ -9,6 +9,7 @@ Program dependencies
 5. Download geckodriver and put in environment variable from https://github.com/mozilla/geckodriver/releases
 """
 import os
+import subprocess
 import time
 import logging
 from logging.handlers import RotatingFileHandler
@@ -22,11 +23,11 @@ class config:
     # login
     url_login = "http://192.168.11.182:8002/"
     username = "crawler"
-    password = "Linkpower2016"
-
+    password = "9uHEw8bdwtrI35+dnJvw"
+    autpassword = r"C:\Users\Public\Documents\idol_doc\autpassword.exe"
     # crawling config
-    # url_start_page = "http://192.168.11.182:8002/"
-    url_start_page = "https://blog.scrapinghub.com/"
+    url_start_page = "http://192.168.11.182:8002/"
+    # url_start_page = "https://blog.scrapinghub.com/"
     depth = 2
     allow_domains = ["blog.scrapinghub.com", "192.168.11.182:8002"]
 
@@ -42,6 +43,21 @@ class config:
 firefox_driver = None
 # for checking file format from headers
 session_requset = None
+
+
+def autpassword_decrypt(path, password):
+    """
+    Decrypt the password from IDOL autpassword.exe
+    Args:
+        path (str): Path of autpassword.exe
+        password (str): encrypted password
+
+    Returns:
+        str: password decrypted
+    """
+    cmd = "{} -d {}".format(path, password)
+    result = subprocess.check_output(cmd).decode("utf-8")
+    return result.strip()
 
 
 def is_file_link(link):
@@ -89,16 +105,17 @@ def get_login_session():
         global firefox_driver
         logging.info("Retrieve firefox login session")
         firefox_driver.get(config.url_login)
-        time.sleep(3)
-        firefox_driver.switch_to.alert.send_keys(config.username + Keys.TAB + config.password)
+        time.sleep(5)
+        de_password = autpassword_decrypt(config.autpassword, config.password)
+        firefox_driver.switch_to.alert.send_keys(config.username + Keys.TAB + de_password)
         time.sleep(0.5)
         firefox_driver.switch_to.alert.accept()
-        time.sleep(1)
-        # firefox_driver.close()
 
         logging.info("Retrieve request login session")
         global session_requset
-        session_requset.get(config.url_login, auth=HttpNtlmAuth(config.username, config.password))
+        session_requset.get(config.url_login, auth=HttpNtlmAuth(config.username, de_password))
+
+        time.sleep(1)
     except Exception as e:
         logging.exception("Found exception when retrieving login session. {}".format(str(e)))
 
