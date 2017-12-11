@@ -90,3 +90,6 @@ ENV/
 *.png
 *.jpg
 *.db
+
+#ide
+.idea
